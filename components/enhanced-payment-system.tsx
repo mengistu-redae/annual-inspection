@@ -1,16 +1,42 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useTransition } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Smartphone, Building2, CreditCard, Coins, QrCode, Users, Calendar, CheckCircle } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import {
+  Smartphone,
+  Building2,
+  CreditCard,
+  Coins,
+  QrCode,
+  Users,
+  Calendar,
+  CheckCircle,
+  AlertCircle,
+  Loader2,
+} from "lucide-react"
+import { initiateTelebirrPayment, initiateCBEBirrPayment, checkPaymentStatus } from "@/app/actions/payment-actions"
+import type { PaymentRequest, PaymentResult } from "@/app/actions/payment-actions"
 
 export function EnhancedPaymentSystem() {
   const [selectedMethod, setSelectedMethod] = useState("")
   const [installmentPlan, setInstallmentPlan] = useState(false)
+  const [paymentForm, setPaymentForm] = useState({
+    customerPhone: "",
+    customerName: "",
+    customerAccount: "",
+    amount: 900,
+    vehicleId: "ET-1234-AA",
+    description: "Road Use Fee Payment",
+  })
+  const [paymentResult, setPaymentResult] = useState<PaymentResult | null>(null)
+  const [paymentStatus, setPaymentStatus] = useState<string>("")
+  const [isPending, startTransition] = useTransition()
 
   const paymentMethods = [
     {
@@ -22,36 +48,40 @@ export function EnhancedPaymentSystem() {
       processingTime: "Instant",
       popularity: "Most Popular",
       features: ["USSD Support", "Offline Capable", "Wide Coverage"],
+      apiIntegrated: true,
     },
     {
       id: "cbe-birr",
       name: "CBE Birr",
       description: "Commercial Bank of Ethiopia",
       icon: Building2,
-      fee: "₹5",
+      fee: "ETB 5",
       processingTime: "Instant",
       popularity: "Popular",
       features: ["Bank Integration", "Account Linking", "Transaction History"],
+      apiIntegrated: true,
     },
     {
       id: "awash-bank",
       name: "Awash Bank Mobile",
       description: "Awash Bank digital wallet",
       icon: Building2,
-      fee: "₹3",
+      fee: "ETB 3",
       processingTime: "Instant",
       popularity: "Growing",
       features: ["Mobile Banking", "QR Payments", "Bill Pay"],
+      apiIntegrated: false,
     },
     {
       id: "dashen-bank",
       name: "Dashen Bank",
       description: "Dashen mobile banking",
       icon: Building2,
-      fee: "₹7",
+      fee: "ETB 7",
       processingTime: "1-2 minutes",
       popularity: "Available",
       features: ["Internet Banking", "Mobile App", "USSD"],
+      apiIntegrated: false,
     },
     {
       id: "crypto",
@@ -62,16 +92,18 @@ export function EnhancedPaymentSystem() {
       processingTime: "10-30 minutes",
       popularity: "Diaspora",
       features: ["Global Access", "No Bank Required", "Stable Coins"],
+      apiIntegrated: false,
     },
     {
       id: "qr-cash",
       name: "QR Code + Cash",
       description: "Scan and pay at agent locations",
       icon: QrCode,
-      fee: "₹10",
+      fee: "ETB 10",
       processingTime: "Instant",
       popularity: "Rural Areas",
       features: ["No Internet Required", "Agent Network", "Cash Accepted"],
+      apiIntegrated: false,
     },
   ]
 
@@ -89,6 +121,77 @@ export function EnhancedPaymentSystem() {
     "Corporate account integration",
   ]
 
+  const handlePayment = async () => {
+    if (!selectedMethod) {
+      setPaymentResult({
+        success: false,
+        message: "Please select a payment method",
+        errorCode: "NO_METHOD_SELECTED",
+      })
+      return
+    }
+
+    const paymentRequest: PaymentRequest = {
+      amount: paymentForm.amount,
+      currency: "ETB",
+      description: paymentForm.description,
+      vehicleId: paymentForm.vehicleId,
+      paymentType: "road_fee",
+      customerPhone: paymentForm.customerPhone,
+      customerName: paymentForm.customerName,
+      customerAccount: paymentForm.customerAccount,
+    }
+
+    startTransition(async () => {
+      try {
+        let result: PaymentResult
+
+        if (selectedMethod === "telebirr") {
+          result = await initiateTelebirrPayment(paymentRequest)
+        } else if (selectedMethod === "cbe-birr") {
+          result = await initiateCBEBirrPayment(paymentRequest)
+        } else {
+          result = {
+            success: false,
+            message: "This payment method is not yet integrated with live APIs",
+            errorCode: "METHOD_NOT_INTEGRATED",
+          }
+        }
+
+        setPaymentResult(result)
+
+        // If payment was initiated successfully, start checking status
+        if (result.success && result.transactionId) {
+          setTimeout(() => {
+            checkStatus(result.transactionId!, selectedMethod as "telebirr" | "cbe_birr")
+          }, 5000) // Check status after 5 seconds
+        }
+      } catch (error) {
+        setPaymentResult({
+          success: false,
+          message: "An unexpected error occurred",
+          errorCode: "UNEXPECTED_ERROR",
+        })
+      }
+    })
+  }
+
+  const checkStatus = async (transactionId: string, provider: "telebirr" | "cbe_birr") => {
+    try {
+      const status = await checkPaymentStatus(transactionId, provider)
+      setPaymentStatus(status.status)
+
+      // Continue checking if payment is still pending
+      if (status.status === "PENDING" || status.status === "INITIATED") {
+        setTimeout(() => {
+          checkStatus(transactionId, provider)
+        }, 10000) // Check again after 10 seconds
+      }
+    } catch (error) {
+      console.error("Status check failed:", error)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <Card>
@@ -96,10 +199,30 @@ export function EnhancedPaymentSystem() {
           <CardTitle className="flex items-center space-x-2">
             <CreditCard className="h-5 w-5" />
             <span>Enhanced Payment System</span>
+            <Badge variant="secondary">Live API Integration</Badge>
           </CardTitle>
-          <CardDescription>Multiple payment options designed for Ethiopian users</CardDescription>
+          <CardDescription>Real-time integration with Ethiopian payment providers</CardDescription>
         </CardHeader>
       </Card>
+
+      {paymentResult && (
+        <Alert variant={paymentResult.success ? "default" : "destructive"}>
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            {paymentResult.message}
+            {paymentResult.transactionId && (
+              <div className="mt-2">
+                <strong>Transaction ID:</strong> {paymentResult.transactionId}
+              </div>
+            )}
+            {paymentStatus && (
+              <div className="mt-2">
+                <strong>Status:</strong> {paymentStatus}
+              </div>
+            )}
+          </AlertDescription>
+        </Alert>
+      )}
 
       <Tabs defaultValue="methods" className="space-y-6">
         <TabsList className="grid w-full grid-cols-4">
@@ -111,6 +234,69 @@ export function EnhancedPaymentSystem() {
 
         <TabsContent value="methods">
           <div className="grid gap-6">
+            {/* Payment Form */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Payment Details</CardTitle>
+                <CardDescription>Enter your payment information</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="customerName">Full Name</Label>
+                    <Input
+                      id="customerName"
+                      value={paymentForm.customerName}
+                      onChange={(e) => setPaymentForm((prev) => ({ ...prev, customerName: e.target.value }))}
+                      placeholder="Enter your full name"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="vehicleId">Vehicle ID</Label>
+                    <Input
+                      id="vehicleId"
+                      value={paymentForm.vehicleId}
+                      onChange={(e) => setPaymentForm((prev) => ({ ...prev, vehicleId: e.target.value }))}
+                      placeholder="ET-1234-AA"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="customerPhone">Phone Number (for Telebirr)</Label>
+                    <Input
+                      id="customerPhone"
+                      value={paymentForm.customerPhone}
+                      onChange={(e) => setPaymentForm((prev) => ({ ...prev, customerPhone: e.target.value }))}
+                      placeholder="+251912345678"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="customerAccount">Account Number (for CBE Birr)</Label>
+                    <Input
+                      id="customerAccount"
+                      value={paymentForm.customerAccount}
+                      onChange={(e) => setPaymentForm((prev) => ({ ...prev, customerAccount: e.target.value }))}
+                      placeholder="1000123456789"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="amount">Amount (ETB)</Label>
+                  <Input
+                    id="amount"
+                    type="number"
+                    value={paymentForm.amount}
+                    onChange={(e) => setPaymentForm((prev) => ({ ...prev, amount: Number(e.target.value) }))}
+                    placeholder="900"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Payment Methods */}
             {paymentMethods.map((method) => (
               <Card
                 key={method.id}
@@ -130,6 +316,11 @@ export function EnhancedPaymentSystem() {
                           <h3 className="font-semibold text-lg">{method.name}</h3>
                           {method.popularity === "Most Popular" && <Badge variant="default">Most Popular</Badge>}
                           {method.popularity === "Diaspora" && <Badge variant="secondary">Diaspora</Badge>}
+                          {method.apiIntegrated && (
+                            <Badge variant="outline" className="bg-green-50 text-green-700">
+                              Live API
+                            </Badge>
+                          )}
                         </div>
                         <p className="text-gray-600 mb-3">{method.description}</p>
                         <div className="grid grid-cols-2 gap-4 text-sm">
@@ -163,6 +354,32 @@ export function EnhancedPaymentSystem() {
                 </CardContent>
               </Card>
             ))}
+
+            {/* Payment Button */}
+            <Card>
+              <CardContent className="p-6">
+                <Button onClick={handlePayment} disabled={!selectedMethod || isPending} className="w-full" size="lg">
+                  {isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Processing Payment...
+                    </>
+                  ) : (
+                    `Pay ETB ${paymentForm.amount} via ${paymentMethods.find((m) => m.id === selectedMethod)?.name || "Selected Method"}`
+                  )}
+                </Button>
+
+                {paymentResult?.qrCode && (
+                  <div className="mt-4 text-center">
+                    <p className="text-sm text-gray-600 mb-2">Scan QR Code with CBE Birr App:</p>
+                    <div className="inline-block p-4 bg-white border rounded-lg">
+                      <QrCode className="h-32 w-32 mx-auto" />
+                      <p className="text-xs mt-2">QR Code would appear here</p>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
         </TabsContent>
 
@@ -175,7 +392,7 @@ export function EnhancedPaymentSystem() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="p-4 bg-blue-50 rounded-lg">
-                  <h4 className="font-medium text-blue-900 mb-2">Total Amount: ₹900</h4>
+                  <h4 className="font-medium text-blue-900 mb-2">Total Amount: ETB 900</h4>
                   <p className="text-sm text-blue-800">Road use fee + penalties for ET-1234-AA</p>
                 </div>
 
@@ -190,11 +407,11 @@ export function EnhancedPaymentSystem() {
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="font-medium">{option.description}</p>
-                        <p className="text-sm text-gray-600">₹{option.monthlyAmount}/month</p>
-                        <p className="text-xs text-gray-500">Processing fee: ₹{option.totalFee}</p>
+                        <p className="text-sm text-gray-600">ETB {option.monthlyAmount}/month</p>
+                        <p className="text-xs text-gray-500">Processing fee: ETB {option.totalFee}</p>
                       </div>
                       <div className="text-right">
-                        <p className="font-bold">₹{option.monthlyAmount}</p>
+                        <p className="font-bold">ETB {option.monthlyAmount}</p>
                         <p className="text-xs text-gray-500">per month</p>
                       </div>
                     </div>
@@ -233,7 +450,7 @@ export function EnhancedPaymentSystem() {
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="font-bold">₹{payment.amount}</p>
+                        <p className="font-bold">ETB {payment.amount}</p>
                         <Badge variant={payment.status === "upcoming" ? "default" : "outline"}>{payment.status}</Badge>
                       </div>
                     </div>
@@ -319,15 +536,15 @@ export function EnhancedPaymentSystem() {
                         </div>
                         <div>
                           <span className="text-gray-600">Total: </span>
-                          <span className="font-medium">₹{group.totalAmount.toLocaleString()}</span>
+                          <span className="font-medium">ETB {group.totalAmount.toLocaleString()}</span>
                         </div>
                         <div>
                           <span className="text-gray-600">Discount: </span>
-                          <span className="font-medium text-green-600">₹{group.discount}</span>
+                          <span className="font-medium text-green-600">ETB {group.discount}</span>
                         </div>
                         <div>
                           <span className="text-gray-600">Final: </span>
-                          <span className="font-bold">₹{(group.totalAmount - group.discount).toLocaleString()}</span>
+                          <span className="font-bold">ETB {(group.totalAmount - group.discount).toLocaleString()}</span>
                         </div>
                       </div>
                     </div>

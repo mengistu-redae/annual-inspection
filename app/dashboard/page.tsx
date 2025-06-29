@@ -1,541 +1,702 @@
 "use client"
 
-import { useState } from "react"
-import Link from "next/link"
-import { Button } from "@/components/ui/button"
+import { useState, useEffect } from "react"
+import { GlobalHeader } from "@/components/global-header"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Car,
-  Users,
-  Building2,
-  Shield,
+  FileText,
   Calendar,
   CreditCard,
-  FileText,
-  Bell,
-  BarChart3,
+  AlertTriangle,
   CheckCircle,
-  AlertCircle,
   Clock,
-  Phone,
-  Mail,
   MapPin,
-  User,
-  MessageSquare,
+  Phone,
+  Package,
+  Download,
+  Eye,
+  RefreshCw,
 } from "lucide-react"
-import { LanguageSwitcher } from "@/components/language-switcher"
-import { SMSNotificationSystem } from "@/components/sms-notification-system"
-import { AgentNetworkDashboard } from "@/components/agent-network-dashboard"
-import { MultiFactorAuth } from "@/components/multi-factor-auth"
-import { getTranslation, type Language } from "@/lib/i18n"
+import Link from "next/link"
+import { useSearchParams } from "next/navigation"
+
+interface Vehicle {
+  plateNumber: string
+  make: string
+  model: string
+  year: number
+  color: string
+  engineNumber: string
+  chassisNumber: string
+  registrationDate: string
+  expiryDate: string
+  status: "active" | "expired" | "suspended"
+  ownerName: string
+  ownerPhone: string
+  inspectionStatus: "valid" | "due" | "overdue"
+  lastInspection: string
+  nextInspection: string
+}
+
+interface Document {
+  id: string
+  type: "registration" | "inspection" | "insurance" | "license"
+  title: string
+  issueDate: string
+  expiryDate: string
+  status: "valid" | "expiring" | "expired"
+  downloadUrl: string
+}
+
+interface Payment {
+  id: string
+  type: "registration" | "inspection" | "penalty" | "renewal"
+  amount: number
+  currency: string
+  status: "paid" | "pending" | "failed"
+  date: string
+  method: "telebirr" | "cbe_birr" | "bank_transfer"
+}
+
+interface Delivery {
+  id: string
+  trackingNumber: string
+  documentType: string
+  status: "pending" | "in_transit" | "delivered" | "failed"
+  estimatedDelivery: string
+  currentLocation: string
+}
 
 export default function DashboardPage() {
-  const [userType, setUserType] = useState("citizen")
-  const [language, setLanguage] = useState<Language>("en")
+  const searchParams = useSearchParams()
+  const plateFromUrl = searchParams.get("plate")
 
-  const citizenStats = [
-    { title: "Active Vehicles", value: "2", icon: Car, color: "text-blue-600" },
-    { title: "Pending Renewals", value: "1", icon: AlertCircle, color: "text-orange-600" },
-    { title: "Completed This Year", value: "1", icon: CheckCircle, color: "text-green-600" },
-    { title: "Next Inspection", value: "45 days", icon: Clock, color: "text-purple-600" },
+  const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  // Mock data - in real app, this would come from API
+  const vehicles: Vehicle[] = [
+    {
+      plateNumber: plateFromUrl || "AA-123456",
+      make: "Toyota",
+      model: "Corolla",
+      year: 2020,
+      color: "White",
+      engineNumber: "1NZ-FE-123456",
+      chassisNumber: "JTDBL40E300123456",
+      registrationDate: "2020-03-15",
+      expiryDate: "2025-03-15",
+      status: "active",
+      ownerName: "Ahmed Hassan",
+      ownerPhone: "+251-911-123456",
+      inspectionStatus: "valid",
+      lastInspection: "2024-01-15",
+      nextInspection: "2025-01-15",
+    },
+    {
+      plateNumber: "AA-789012",
+      make: "Hyundai",
+      model: "Elantra",
+      year: 2019,
+      color: "Blue",
+      engineNumber: "G4FG-789012",
+      chassisNumber: "KMHD14LA5KA789012",
+      registrationDate: "2019-08-20",
+      expiryDate: "2024-08-20",
+      status: "expired",
+      ownerName: "Ahmed Hassan",
+      ownerPhone: "+251-911-123456",
+      inspectionStatus: "overdue",
+      lastInspection: "2023-08-20",
+      nextInspection: "2024-08-20",
+    },
   ]
 
-  const inspectionCenterStats = [
-    { title: "Today's Appointments", value: "24", icon: Calendar, color: "text-blue-600" },
-    { title: "Completed Inspections", value: "18", icon: CheckCircle, color: "text-green-600" },
-    { title: "Pending Inspections", value: "6", icon: Clock, color: "text-orange-600" },
-    { title: "Monthly Revenue", value: "₹45,200", icon: CreditCard, color: "text-purple-600" },
+  const documents: Document[] = [
+    {
+      id: "1",
+      type: "registration",
+      title: "Vehicle Registration Certificate",
+      issueDate: "2020-03-15",
+      expiryDate: "2025-03-15",
+      status: "valid",
+      downloadUrl: "/documents/registration-aa123456.pdf",
+    },
+    {
+      id: "2",
+      type: "inspection",
+      title: "Vehicle Inspection Certificate",
+      issueDate: "2024-01-15",
+      expiryDate: "2025-01-15",
+      status: "valid",
+      downloadUrl: "/documents/inspection-aa123456.pdf",
+    },
   ]
 
-  const authorityStats = [
-    { title: "Total Registrations", value: "1,247", icon: FileText, color: "text-blue-600" },
-    { title: "Active Centers", value: "23", icon: Building2, color: "text-green-600" },
-    { title: "Revenue Collected", value: "₹2.4M", icon: CreditCard, color: "text-purple-600" },
-    { title: "Compliance Rate", value: "94%", icon: BarChart3, color: "text-orange-600" },
+  const payments: Payment[] = [
+    {
+      id: "1",
+      type: "registration",
+      amount: 500,
+      currency: "ETB",
+      status: "paid",
+      date: "2024-01-15",
+      method: "telebirr",
+    },
+    {
+      id: "2",
+      type: "inspection",
+      amount: 200,
+      currency: "ETB",
+      status: "paid",
+      date: "2024-01-15",
+      method: "cbe_birr",
+    },
   ]
 
-  const insuranceStats = [
-    { title: "Active Policies", value: "3,456", icon: Shield, color: "text-blue-600" },
-    { title: "Renewals This Month", value: "234", icon: CheckCircle, color: "text-green-600" },
-    { title: "Pending Verifications", value: "12", icon: Clock, color: "text-orange-600" },
-    { title: "Premium Collected", value: "₹890K", icon: CreditCard, color: "text-purple-600" },
+  const deliveries: Delivery[] = [
+    {
+      id: "1",
+      trackingNumber: "EP-2024-001234",
+      documentType: "Registration Certificate",
+      status: "delivered",
+      estimatedDelivery: "2024-01-18",
+      currentLocation: "Delivered - Addis Ababa",
+    },
   ]
 
-  const getStats = () => {
-    switch (userType) {
-      case "citizen":
-        return citizenStats
-      case "inspection":
-        return inspectionCenterStats
-      case "authority":
-        return authorityStats
-      case "insurance":
-        return insuranceStats
+  useEffect(() => {
+    // Simulate loading
+    setTimeout(() => {
+      setSelectedVehicle(vehicles[0])
+      setLoading(false)
+    }, 1000)
+  }, [])
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "active":
+      case "valid":
+      case "paid":
+      case "delivered":
+        return "bg-green-100 text-green-800"
+      case "expired":
+      case "overdue":
+      case "failed":
+        return "bg-red-100 text-red-800"
+      case "expiring":
+      case "due":
+      case "pending":
+      case "in_transit":
+        return "bg-yellow-100 text-yellow-800"
       default:
-        return citizenStats
+        return "bg-gray-100 text-gray-800"
     }
   }
 
-  const recentActivities = {
-    citizen: [
-      { action: "Vehicle inspection completed", vehicle: "ET-1234-AA", date: "2024-01-15", status: "success" },
-      { action: "Insurance renewed", vehicle: "ET-5678-BB", date: "2024-01-10", status: "success" },
-      { action: "Road use fee paid", vehicle: "ET-1234-AA", date: "2024-01-08", status: "success" },
-      { action: "Appointment booked", vehicle: "ET-5678-BB", date: "2024-01-05", status: "pending" },
-    ],
-    inspection: [
-      { action: "Inspection completed - Pass", vehicle: "ET-9876-CC", date: "2024-01-15", status: "success" },
-      { action: "Inspection completed - Fail", vehicle: "ET-5432-DD", date: "2024-01-15", status: "error" },
-      { action: "Appointment confirmed", vehicle: "ET-1111-EE", date: "2024-01-14", status: "pending" },
-      { action: "Payment received", vehicle: "ET-2222-FF", date: "2024-01-14", status: "success" },
-    ],
-    authority: [
-      { action: "Registration renewed", vehicle: "ET-3333-GG", date: "2024-01-15", status: "success" },
-      { action: "New center approved", vehicle: "Addis Inspection Hub", date: "2024-01-12", status: "success" },
-      { action: "Compliance audit completed", vehicle: "Bahir Dar Center", date: "2024-01-10", status: "success" },
-      { action: "Revenue report generated", vehicle: "Monthly Report", date: "2024-01-08", status: "success" },
-    ],
-    insurance: [
-      { action: "Policy renewed", vehicle: "ET-4444-HH", date: "2024-01-15", status: "success" },
-      { action: "Claim processed", vehicle: "ET-5555-II", date: "2024-01-14", status: "success" },
-      { action: "Verification completed", vehicle: "ET-6666-JJ", date: "2024-01-12", status: "success" },
-      { action: "Premium collected", vehicle: "ET-7777-KK", date: "2024-01-10", status: "success" },
-    ],
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case "active":
+      case "valid":
+      case "paid":
+      case "delivered":
+        return <CheckCircle className="h-4 w-4" />
+      case "expired":
+      case "overdue":
+      case "failed":
+        return <AlertTriangle className="h-4 w-4" />
+      case "expiring":
+      case "due":
+      case "pending":
+      case "in_transit":
+        return <Clock className="h-4 w-4" />
+      default:
+        return <Clock className="h-4 w-4" />
+    }
   }
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <Link href="/" className="flex items-center space-x-2">
-                <Car className="h-8 w-8 text-blue-600" />
-                <span className="text-2xl font-bold text-gray-900">ቦሎ Digital</span>
-              </Link>
-              <Badge variant="outline">{getTranslation("dashboard", language)}</Badge>
-            </div>
-            <div className="flex items-center space-x-4">
-              <LanguageSwitcher currentLanguage={language} onLanguageChange={(lang) => setLanguage(lang as Language)} />
-              <Button variant="outline" size="sm">
-                <Bell className="h-4 w-4 mr-2" />
-                {getTranslation("notifications", language) || "Notifications"}
-              </Button>
-              <Button variant="outline" size="sm">
-                <User className="h-4 w-4 mr-2" />
-                Profile
-              </Button>
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50">
+        <GlobalHeader
+          title="Dashboard"
+          subtitle="Vehicle Information & Services"
+          userRole="citizen"
+          userName="Ahmed Hassan"
+        />
+        <div className="container mx-auto px-4 py-8">
+          <div className="flex items-center justify-center h-64">
+            <div className="text-center">
+              <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
+              <p className="text-gray-600">Loading your vehicle information...</p>
             </div>
           </div>
         </div>
-      </header>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50">
+      <GlobalHeader
+        title="Dashboard"
+        subtitle="Vehicle Information & Services"
+        userRole="citizen"
+        userName="Ahmed Hassan"
+      />
 
       <div className="container mx-auto px-4 py-8">
-        {/* User Type Selection */}
+        {/* Vehicle Selector */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-6">Dashboard</h1>
-          <Tabs value={userType} onValueChange={setUserType} className="w-full">
-            <TabsList className="grid w-full grid-cols-7">
-              <TabsTrigger value="citizen" className="flex items-center space-x-2">
-                <Users className="h-4 w-4" />
-                <span>Vehicle Owner</span>
-              </TabsTrigger>
-              <TabsTrigger value="inspection" className="flex items-center space-x-2">
-                <Building2 className="h-4 w-4" />
-                <span>Inspection Center</span>
-              </TabsTrigger>
-              <TabsTrigger value="authority" className="flex items-center space-x-2">
-                <Shield className="h-4 w-4" />
-                <span>Transport Authority</span>
-              </TabsTrigger>
-              <TabsTrigger value="insurance" className="flex items-center space-x-2">
-                <Car className="h-4 w-4" />
-                <span>Insurance Company</span>
-              </TabsTrigger>
-              <TabsTrigger value="sms" className="flex items-center space-x-2">
-                <MessageSquare className="h-4 w-4" />
-                <span>SMS Center</span>
-              </TabsTrigger>
-              <TabsTrigger value="agents" className="flex items-center space-x-2">
-                <Users className="h-4 w-4" />
-                <span>Agent Network</span>
-              </TabsTrigger>
-              <TabsTrigger value="security" className="flex items-center space-x-2">
-                <Shield className="h-4 w-4" />
-                <span>Security</span>
-              </TabsTrigger>
+          <h1 className="text-3xl font-bold text-gray-900 mb-4">My Vehicles</h1>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {vehicles.map((vehicle) => (
+              <Card
+                key={vehicle.plateNumber}
+                className={`cursor-pointer transition-all ${
+                  selectedVehicle?.plateNumber === vehicle.plateNumber
+                    ? "ring-2 ring-blue-500 bg-blue-50"
+                    : "hover:shadow-md"
+                }`}
+                onClick={() => setSelectedVehicle(vehicle)}
+              >
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg font-mono">{vehicle.plateNumber}</CardTitle>
+                    <Badge className={getStatusColor(vehicle.status)}>
+                      {getStatusIcon(vehicle.status)}
+                      <span className="ml-1 capitalize">{vehicle.status}</span>
+                    </Badge>
+                  </div>
+                  <CardDescription>
+                    {vehicle.year} {vehicle.make} {vehicle.model}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Registration:</span>
+                      <span className={vehicle.status === "expired" ? "text-red-600" : "text-green-600"}>
+                        {vehicle.status === "expired" ? "Expired" : "Valid"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Inspection:</span>
+                      <span
+                        className={
+                          vehicle.inspectionStatus === "overdue"
+                            ? "text-red-600"
+                            : vehicle.inspectionStatus === "due"
+                              ? "text-yellow-600"
+                              : "text-green-600"
+                        }
+                      >
+                        {vehicle.inspectionStatus === "overdue"
+                          ? "Overdue"
+                          : vehicle.inspectionStatus === "due"
+                            ? "Due Soon"
+                            : "Valid"}
+                      </span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+
+        {selectedVehicle && (
+          <Tabs defaultValue="overview" className="space-y-6">
+            <TabsList className="grid w-full grid-cols-5">
+              <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="documents">Documents</TabsTrigger>
+              <TabsTrigger value="payments">Payments</TabsTrigger>
+              <TabsTrigger value="delivery">Delivery</TabsTrigger>
+              <TabsTrigger value="services">Services</TabsTrigger>
             </TabsList>
 
-            {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-8">
-              {getStats().map((stat, index) => (
-                <Card key={index}>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
-                    <stat.icon className={`h-4 w-4 ${stat.color}`} />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">{stat.value}</div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-
-            {/* Content for each user type */}
-            <TabsContent value="citizen" className="mt-8">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-2 space-y-6">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>My Vehicles</CardTitle>
-                      <CardDescription>Manage your registered vehicles</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="flex items-center justify-between p-4 border rounded-lg">
-                        <div className="flex items-center space-x-4">
-                          <Car className="h-8 w-8 text-blue-600" />
-                          <div>
-                            <p className="font-medium">Toyota Corolla - ET-1234-AA</p>
-                            <p className="text-sm text-gray-600">Next inspection: March 15, 2024</p>
-                          </div>
+            <TabsContent value="overview" className="space-y-6">
+              {/* Vehicle Details */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <Car className="h-5 w-5 mr-2" />
+                    Vehicle Information
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div>
+                      <h3 className="font-semibold text-gray-700 mb-3">Basic Information</h3>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Plate Number:</span>
+                          <span className="font-mono font-semibold">{selectedVehicle.plateNumber}</span>
                         </div>
-                        <Badge variant="secondary">Active</Badge>
-                      </div>
-                      <div className="flex items-center justify-between p-4 border rounded-lg">
-                        <div className="flex items-center space-x-4">
-                          <Car className="h-8 w-8 text-orange-600" />
-                          <div>
-                            <p className="font-medium">Hyundai Elantra - ET-5678-BB</p>
-                            <p className="text-sm text-gray-600">Inspection overdue</p>
-                          </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Make & Model:</span>
+                          <span>
+                            {selectedVehicle.make} {selectedVehicle.model}
+                          </span>
                         </div>
-                        <Badge variant="destructive">Overdue</Badge>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Quick Actions</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid grid-cols-2 gap-4">
-                        <Link href="/book-appointment">
-                          <Button className="w-full">
-                            <Calendar className="h-4 w-4 mr-2" />
-                            Book Inspection
-                          </Button>
-                        </Link>
-                        <Link href="/payments">
-                          <Button variant="outline" className="w-full bg-transparent">
-                            <CreditCard className="h-4 w-4 mr-2" />
-                            Pay Fees
-                          </Button>
-                        </Link>
-                        <Link href="/documents">
-                          <Button variant="outline" className="w-full bg-transparent">
-                            <FileText className="h-4 w-4 mr-2" />
-                            View Documents
-                          </Button>
-                        </Link>
-                        <Link href="/notifications">
-                          <Button variant="outline" className="w-full bg-transparent">
-                            <Bell className="h-4 w-4 mr-2" />
-                            Notifications
-                          </Button>
-                        </Link>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-
-                <div>
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Recent Activity</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        {recentActivities.citizen.map((activity, index) => (
-                          <div key={index} className="flex items-center space-x-3">
-                            <div
-                              className={`w-2 h-2 rounded-full ${
-                                activity.status === "success"
-                                  ? "bg-green-500"
-                                  : activity.status === "error"
-                                    ? "bg-red-500"
-                                    : "bg-yellow-500"
-                              }`}
-                            />
-                            <div className="flex-1">
-                              <p className="text-sm font-medium">{activity.action}</p>
-                              <p className="text-xs text-gray-600">{activity.vehicle}</p>
-                              <p className="text-xs text-gray-500">{activity.date}</p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="inspection" className="mt-8">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-2 space-y-6">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Today's Schedule</CardTitle>
-                      <CardDescription>Manage inspection appointments</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        {[
-                          { time: "09:00", vehicle: "ET-1111-AA", owner: "Abebe Kebede", status: "completed" },
-                          { time: "10:30", vehicle: "ET-2222-BB", owner: "Almaz Tadesse", status: "in-progress" },
-                          { time: "14:00", vehicle: "ET-3333-CC", owner: "Dawit Haile", status: "scheduled" },
-                          { time: "15:30", vehicle: "ET-4444-DD", owner: "Hanan Ahmed", status: "scheduled" },
-                        ].map((appointment, index) => (
-                          <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
-                            <div className="flex items-center space-x-4">
-                              <div className="text-center">
-                                <p className="font-medium">{appointment.time}</p>
-                              </div>
-                              <div>
-                                <p className="font-medium">{appointment.vehicle}</p>
-                                <p className="text-sm text-gray-600">{appointment.owner}</p>
-                              </div>
-                            </div>
-                            <Badge
-                              variant={
-                                appointment.status === "completed"
-                                  ? "default"
-                                  : appointment.status === "in-progress"
-                                    ? "secondary"
-                                    : "outline"
-                              }
-                            >
-                              {appointment.status}
-                            </Badge>
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-
-                <div>
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Center Information</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="flex items-center space-x-2">
-                        <MapPin className="h-4 w-4 text-gray-600" />
-                        <span className="text-sm">Addis Ababa, Bole District</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Phone className="h-4 w-4 text-gray-600" />
-                        <span className="text-sm">+251-11-123-4567</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Mail className="h-4 w-4 text-gray-600" />
-                        <span className="text-sm">info@bolecenter.et</span>
-                      </div>
-                      <div className="pt-4">
-                        <Button className="w-full">
-                          <BarChart3 className="h-4 w-4 mr-2" />
-                          View Analytics
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="authority" className="mt-8">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>System Overview</CardTitle>
-                    <CardDescription>Platform performance and compliance</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-6">
-                      <div>
-                        <div className="flex justify-between text-sm mb-2">
-                          <span>Registration Completion Rate</span>
-                          <span>94%</span>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Year:</span>
+                          <span>{selectedVehicle.year}</span>
                         </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div className="bg-green-600 h-2 rounded-full" style={{ width: "94%" }}></div>
-                        </div>
-                      </div>
-                      <div>
-                        <div className="flex justify-between text-sm mb-2">
-                          <span>Digital Payment Adoption</span>
-                          <span>78%</span>
-                        </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div className="bg-blue-600 h-2 rounded-full" style={{ width: "78%" }}></div>
-                        </div>
-                      </div>
-                      <div>
-                        <div className="flex justify-between text-sm mb-2">
-                          <span>Center Utilization</span>
-                          <span>85%</span>
-                        </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div className="bg-purple-600 h-2 rounded-full" style={{ width: "85%" }}></div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Color:</span>
+                          <span>{selectedVehicle.color}</span>
                         </div>
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
 
+                    <div>
+                      <h3 className="font-semibold text-gray-700 mb-3">Technical Details</h3>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Engine Number:</span>
+                          <span className="font-mono text-xs">{selectedVehicle.engineNumber}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Chassis Number:</span>
+                          <span className="font-mono text-xs">{selectedVehicle.chassisNumber}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h3 className="font-semibold text-gray-700 mb-3">Owner Information</h3>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Owner:</span>
+                          <span>{selectedVehicle.ownerName}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Phone:</span>
+                          <span>{selectedVehicle.ownerPhone}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Status Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Card>
                   <CardHeader>
-                    <CardTitle>Revenue Analytics</CardTitle>
-                    <CardDescription>Financial performance tracking</CardDescription>
+                    <CardTitle className="flex items-center">
+                      <FileText className="h-5 w-5 mr-2" />
+                      Registration Status
+                    </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
-                      <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
-                        <span className="text-sm font-medium">Registration Fees</span>
-                        <span className="font-bold text-blue-600">₹1.2M</span>
+                      <div className="flex items-center justify-between">
+                        <span>Status:</span>
+                        <Badge className={getStatusColor(selectedVehicle.status)}>
+                          {getStatusIcon(selectedVehicle.status)}
+                          <span className="ml-1 capitalize">{selectedVehicle.status}</span>
+                        </Badge>
                       </div>
-                      <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
-                        <span className="text-sm font-medium">Service Charges</span>
-                        <span className="font-bold text-green-600">₹800K</span>
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span>Registered:</span>
+                          <span>{new Date(selectedVehicle.registrationDate).toLocaleDateString()}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span>Expires:</span>
+                          <span>{new Date(selectedVehicle.expiryDate).toLocaleDateString()}</span>
+                        </div>
                       </div>
-                      <div className="flex justify-between items-center p-3 bg-purple-50 rounded-lg">
-                        <span className="text-sm font-medium">Penalty Collections</span>
-                        <span className="font-bold text-purple-600">₹400K</span>
-                      </div>
-                      <div className="pt-4">
-                        <Button className="w-full">
-                          <FileText className="h-4 w-4 mr-2" />
-                          Generate Report
+                      {selectedVehicle.status === "expired" && (
+                        <Button className="w-full" asChild>
+                          <Link href="/payments">
+                            <CreditCard className="h-4 w-4 mr-2" />
+                            Renew Registration
+                          </Link>
                         </Button>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center">
+                      <Calendar className="h-5 w-5 mr-2" />
+                      Inspection Status
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <span>Status:</span>
+                        <Badge className={getStatusColor(selectedVehicle.inspectionStatus)}>
+                          {getStatusIcon(selectedVehicle.inspectionStatus)}
+                          <span className="ml-1 capitalize">{selectedVehicle.inspectionStatus}</span>
+                        </Badge>
                       </div>
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span>Last Inspection:</span>
+                          <span>{new Date(selectedVehicle.lastInspection).toLocaleDateString()}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span>Next Due:</span>
+                          <span>{new Date(selectedVehicle.nextInspection).toLocaleDateString()}</span>
+                        </div>
+                      </div>
+                      {selectedVehicle.inspectionStatus !== "valid" && (
+                        <Button className="w-full" asChild>
+                          <Link href="/book-appointment">
+                            <Calendar className="h-4 w-4 mr-2" />
+                            Book Inspection
+                          </Link>
+                        </Button>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
               </div>
             </TabsContent>
 
-            <TabsContent value="insurance" className="mt-8">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-2">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Policy Management</CardTitle>
-                      <CardDescription>Active insurance policies and renewals</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        {[
-                          {
-                            policy: "POL-2024-001",
-                            vehicle: "ET-1234-AA",
-                            owner: "Abebe Kebede",
-                            expiry: "2024-06-15",
-                            status: "active",
-                          },
-                          {
-                            policy: "POL-2024-002",
-                            vehicle: "ET-5678-BB",
-                            owner: "Almaz Tadesse",
-                            expiry: "2024-03-20",
-                            status: "expiring",
-                          },
-                          {
-                            policy: "POL-2024-003",
-                            vehicle: "ET-9012-CC",
-                            owner: "Dawit Haile",
-                            expiry: "2024-08-10",
-                            status: "active",
-                          },
-                          {
-                            policy: "POL-2024-004",
-                            vehicle: "ET-3456-DD",
-                            owner: "Hanan Ahmed",
-                            expiry: "2024-02-28",
-                            status: "expired",
-                          },
-                        ].map((policy, index) => (
-                          <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
-                            <div>
-                              <p className="font-medium">{policy.policy}</p>
-                              <p className="text-sm text-gray-600">
-                                {policy.vehicle} - {policy.owner}
-                              </p>
-                              <p className="text-xs text-gray-500">Expires: {policy.expiry}</p>
-                            </div>
-                            <Badge
-                              variant={
-                                policy.status === "active"
-                                  ? "default"
-                                  : policy.status === "expiring"
-                                    ? "secondary"
-                                    : "destructive"
-                              }
-                            >
-                              {policy.status}
-                            </Badge>
+            <TabsContent value="documents" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <FileText className="h-5 w-5 mr-2" />
+                    Vehicle Documents
+                  </CardTitle>
+                  <CardDescription>Download and manage your vehicle certificates</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {documents.map((doc) => (
+                      <div key={doc.id} className="flex items-center justify-between p-4 border rounded-lg">
+                        <div className="flex items-center space-x-4">
+                          <FileText className="h-8 w-8 text-blue-600" />
+                          <div>
+                            <h3 className="font-semibold">{doc.title}</h3>
+                            <p className="text-sm text-gray-600">
+                              Issued: {new Date(doc.issueDate).toLocaleDateString()} | Expires:{" "}
+                              {new Date(doc.expiryDate).toLocaleDateString()}
+                            </p>
                           </div>
-                        ))}
+                        </div>
+                        <div className="flex items-center space-x-3">
+                          <Badge className={getStatusColor(doc.status)}>
+                            {getStatusIcon(doc.status)}
+                            <span className="ml-1 capitalize">{doc.status}</span>
+                          </Badge>
+                          <Button size="sm" variant="outline">
+                            <Download className="h-4 w-4 mr-2" />
+                            Download
+                          </Button>
+                          <Button size="sm" variant="ghost">
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
-                    </CardContent>
-                  </Card>
-                </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
 
-                <div>
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Quick Actions</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      <Button className="w-full">
-                        <Shield className="h-4 w-4 mr-2" />
-                        New Policy
-                      </Button>
-                      <Button variant="outline" className="w-full bg-transparent">
-                        <CheckCircle className="h-4 w-4 mr-2" />
-                        Verify Claims
-                      </Button>
-                      <Button variant="outline" className="w-full bg-transparent">
-                        <BarChart3 className="h-4 w-4 mr-2" />
-                        View Reports
-                      </Button>
-                      <Button variant="outline" className="w-full bg-transparent">
-                        <Bell className="h-4 w-4 mr-2" />
-                        Send Reminders
-                      </Button>
-                    </CardContent>
-                  </Card>
-                </div>
+            <TabsContent value="payments" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <CreditCard className="h-5 w-5 mr-2" />
+                    Payment History
+                  </CardTitle>
+                  <CardDescription>View your payment history and make new payments</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {payments.map((payment) => (
+                      <div key={payment.id} className="flex items-center justify-between p-4 border rounded-lg">
+                        <div className="flex items-center space-x-4">
+                          <CreditCard className="h-8 w-8 text-green-600" />
+                          <div>
+                            <h3 className="font-semibold capitalize">{payment.type} Fee</h3>
+                            <p className="text-sm text-gray-600">
+                              {new Date(payment.date).toLocaleDateString()} |
+                              {payment.method.replace("_", " ").toUpperCase()}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-3">
+                          <span className="font-semibold">
+                            {payment.amount} {payment.currency}
+                          </span>
+                          <Badge className={getStatusColor(payment.status)}>
+                            {getStatusIcon(payment.status)}
+                            <span className="ml-1 capitalize">{payment.status}</span>
+                          </Badge>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-6">
+                    <Button asChild>
+                      <Link href="/payments">
+                        <CreditCard className="h-4 w-4 mr-2" />
+                        Make New Payment
+                      </Link>
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="delivery" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <Package className="h-5 w-5 mr-2" />
+                    Document Delivery via Ethiopia Post
+                  </CardTitle>
+                  <CardDescription>Track your document deliveries and schedule new ones</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {deliveries.map((delivery) => (
+                      <div key={delivery.id} className="flex items-center justify-between p-4 border rounded-lg">
+                        <div className="flex items-center space-x-4">
+                          <Package className="h-8 w-8 text-purple-600" />
+                          <div>
+                            <h3 className="font-semibold">{delivery.documentType}</h3>
+                            <p className="text-sm text-gray-600">Tracking: {delivery.trackingNumber}</p>
+                            <p className="text-sm text-gray-500">{delivery.currentLocation}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-3">
+                          <Badge className={getStatusColor(delivery.status)}>
+                            {getStatusIcon(delivery.status)}
+                            <span className="ml-1 capitalize">{delivery.status.replace("_", " ")}</span>
+                          </Badge>
+                          <Button size="sm" variant="outline">
+                            Track Package
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-6">
+                    <Button asChild>
+                      <Link href="/documents">
+                        <Package className="h-4 w-4 mr-2" />
+                        Schedule New Delivery
+                      </Link>
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="services" className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <Card className="hover:shadow-lg transition-shadow">
+                  <CardHeader>
+                    <Calendar className="h-8 w-8 text-blue-600 mb-2" />
+                    <CardTitle>Book Inspection</CardTitle>
+                    <CardDescription>Schedule your next vehicle inspection</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Button className="w-full" asChild>
+                      <Link href="/book-appointment">
+                        <Calendar className="h-4 w-4 mr-2" />
+                        Book Now
+                      </Link>
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                <Card className="hover:shadow-lg transition-shadow">
+                  <CardHeader>
+                    <CreditCard className="h-8 w-8 text-green-600 mb-2" />
+                    <CardTitle>Make Payment</CardTitle>
+                    <CardDescription>Pay registration fees and penalties</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Button className="w-full" asChild>
+                      <Link href="/payments">
+                        <CreditCard className="h-4 w-4 mr-2" />
+                        Pay Now
+                      </Link>
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                <Card className="hover:shadow-lg transition-shadow">
+                  <CardHeader>
+                    <FileText className="h-8 w-8 text-purple-600 mb-2" />
+                    <CardTitle>Download Documents</CardTitle>
+                    <CardDescription>Access your digital certificates</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Button className="w-full" asChild>
+                      <Link href="/documents">
+                        <FileText className="h-4 w-4 mr-2" />
+                        View Documents
+                      </Link>
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                <Card className="hover:shadow-lg transition-shadow">
+                  <CardHeader>
+                    <Package className="h-8 w-8 text-orange-600 mb-2" />
+                    <CardTitle>Document Delivery</CardTitle>
+                    <CardDescription>Schedule delivery via Ethiopia Post</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Button className="w-full" asChild>
+                      <Link href="/documents">
+                        <Package className="h-4 w-4 mr-2" />
+                        Schedule Delivery
+                      </Link>
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                <Card className="hover:shadow-lg transition-shadow">
+                  <CardHeader>
+                    <MapPin className="h-8 w-8 text-red-600 mb-2" />
+                    <CardTitle>Find Centers</CardTitle>
+                    <CardDescription>Locate nearby inspection centers</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Button className="w-full bg-transparent" variant="outline">
+                      <MapPin className="h-4 w-4 mr-2" />
+                      Find Centers
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                <Card className="hover:shadow-lg transition-shadow">
+                  <CardHeader>
+                    <Phone className="h-8 w-8 text-indigo-600 mb-2" />
+                    <CardTitle>Get Support</CardTitle>
+                    <CardDescription>Contact customer support</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Button className="w-full bg-transparent" variant="outline">
+                      <Phone className="h-4 w-4 mr-2" />
+                      Contact Support
+                    </Button>
+                  </CardContent>
+                </Card>
               </div>
             </TabsContent>
-
-            <TabsContent value="sms" className="mt-8">
-              <SMSNotificationSystem />
-            </TabsContent>
-
-            <TabsContent value="agents" className="mt-8">
-              <AgentNetworkDashboard />
-            </TabsContent>
-
-            <TabsContent value="security" className="mt-8">
-              <MultiFactorAuth />
-            </TabsContent>
           </Tabs>
-        </div>
+        )}
       </div>
     </div>
   )
